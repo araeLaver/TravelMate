@@ -1,0 +1,194 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml
+  http2:
+    enabled: true
+
+spring:
+  application:
+    name: travel-mate-backend
+  
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+---
+# 개발 환경 설정
+spring:
+  config:
+    activate:
+      on-profile: dev
+  
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+        
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+logging:
+  level:
+    com.travelmate: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    
+app:
+  jwt:
+    secret: ${JWT_SECRET:devSecretKey123!@#ForDevelopmentOnly}
+    expiration: 86400000  # 24 hours
+    refresh-expiration: 604800000  # 7 days
+  
+  file:
+    upload:
+      path: ./uploads/
+      max-size: 10MB
+      
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8081
+    
+---
+# 운영 환경 설정 (PostgreSQL)
+spring:
+  config:
+    activate:
+      on-profile: prod
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:travelmate}
+    username: ${DB_USERNAME:travelmate_user}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+        order_updates: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+            
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=10m
+      
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    jedis:
+      pool:
+        max-active: 10
+        max-idle: 5
+        min-idle: 1
+
+logging:
+  level:
+    com.travelmate: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.springframework.web: INFO
+  pattern:
+    file: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  file:
+    name: logs/travelmate.log
+    max-size: 100MB
+    max-history: 30
+    
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 3600000    # 1 hour (운영환경에서는 짧게)
+    refresh-expiration: 604800000  # 7 days
+    
+  file:
+    upload:
+      path: ${FILE_UPLOAD_PATH:/app/uploads/}
+      max-size: 5MB
+      
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://travelmate.app,https://admin.travelmate.app}
+    
+  security:
+    rate-limit:
+      enabled: true
+      default-requests-per-minute: 60
+      
+---
+# 테스트 환경 설정
+spring:
+  config:
+    activate:
+      on-profile: test
+      
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        
+logging:
+  level:
+    com.travelmate: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+    
+app:
+  jwt:
+    secret: testSecretKey123
+    expiration: 3600000

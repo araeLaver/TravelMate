@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # TravelMate 통합 애플리케이션 (백엔드 + 프론트엔드)
+  travelmate:
+    build: .
+    container_name: travelmate-app
+    restart: unless-stopped
+    ports:
+      - "80:80"      # 웹 프론트엔드
+      - "8080:8080"  # API 백엔드
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - JWT_SECRET=${JWT_SECRET:-TravelMateSecretKey2024ForDevelopment}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/var/log
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health || true"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL (운영용 - 선택사항)
+  postgres:
+    image: postgres:15-alpine
+    container_name: travelmate-postgres
+    environment:
+      POSTGRES_DB: travelmate
+      POSTGRES_USER: travelmate_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-travelmate_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Redis (캐시 - 선택사항)
+  redis:
+    image: redis:7-alpine
+    container_name: travelmate-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:

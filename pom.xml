@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <modelVersion>4.0.0</modelVersion>
+    
+    <groupId>com.travelmate</groupId>
+    <artifactId>travel-mate</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    
+    <name>TravelMate Full-Stack Application</name>
+    <description>TravelMate integrated project with Backend, Web Frontend, and Mobile App</description>
+    
+    <properties>
+        <java.version>17</java.version>
+        <spring-boot.version>3.2.0</spring-boot.version>
+        <node.version>v20.10.0</node.version>
+        <npm.version>10.2.3</npm.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+    
+    <!-- 하위 모듈 정의 -->
+    <modules>
+        <module>travelmate-backend</module>
+        <module>travelmate-web</module>
+        <module>travelmate-mobile</module>
+        <module>travelmate-shared</module>
+    </modules>
+    
+    <!-- Dependency Management for all modules -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+            <!-- Inter-module dependencies -->
+            <dependency>
+                <groupId>com.travelmate</groupId>
+                <artifactId>travelmate-shared</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                    </configuration>
+                </plugin>
+                
+                <!-- Frontend Maven Plugin for Node.js/NPM -->
+                <plugin>
+                    <groupId>com.github.eirslett</groupId>
+                    <artifactId>frontend-maven-plugin</artifactId>
+                    <version>1.14.2</version>
+                    <configuration>
+                        <nodeVersion>${node.version}</nodeVersion>
+                        <npmVersion>${npm.version}</npmVersion>
+                    </configuration>
+                </plugin>
+                
+                <!-- Maven Resources Plugin -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.3.1</version>
+                </plugin>
+                
+                <!-- Maven Surefire Plugin -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.1.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        
+        <plugins>
+            <!-- Maven Wrapper Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-wrapper-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mavenVersion>3.9.4</mavenVersion>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <!-- Profiles for different environments -->
+    <profiles>
+        <!-- Development Profile -->
+        <profile>
+            <id>dev</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <spring.profiles.active>dev</spring.profiles.active>
+                <build.env>development</build.env>
+            </properties>
+        </profile>
+        
+        <!-- Production Profile -->
+        <profile>
+            <id>prod</id>
+            <properties>
+                <spring.profiles.active>prod</spring.profiles.active>
+                <build.env>production</build.env>
+            </properties>
+        </profile>
+        
+        <!-- Test Profile -->
+        <profile>
+            <id>test</id>
+            <properties>
+                <spring.profiles.active>test</spring.profiles.active>
+                <build.env>test</build.env>
+            </properties>
+        </profile>
+        
+        <!-- Skip Frontend Build (Backend only development) -->
+        <profile>
+            <id>backend-only</id>
+            <properties>
+                <skip.frontend.build>true</skip.frontend.build>
+            </properties>
+        </profile>
+        
+        <!-- Full Build (CI/CD) -->
+        <profile>
+            <id>full-build</id>
+            <properties>
+                <skip.frontend.build>false</skip.frontend.build>
+                <skip.mobile.build>false</skip.mobile.build>
+            </properties>
+        </profile>
+    </profiles>
+    
+    <!-- Distribution Management -->
+    <distributionManagement>
+        <repository>
+            <id>internal-releases</id>
+            <name>Internal Releases</name>
+            <url>http://localhost:8081/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>internal-snapshots</id>
+            <name>Internal Snapshots</name>
+            <url>http://localhost:8081/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+    
+    <!-- SCM Information -->
+    <scm>
+        <connection>scm:git:git://github.com/username/travel-mate.git</connection>
+        <developerConnection>scm:git:ssh://github.com:username/travel-mate.git</developerConnection>
+        <url>http://github.com/username/travel-mate/tree/master</url>
+    </scm>
+    
+    <!-- Issue Management -->
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/username/travel-mate/issues</url>
+    </issueManagement>
+    
+    <!-- Developers -->
+    <developers>
+        <developer>
+            <id>dev1</id>
+            <name>Developer 1</name>
+            <email>dev1@travelmate.com</email>
+            <roles>
+                <role>Full-Stack Developer</role>
+            </roles>
+        </developer>
+    </developers>
+</project>

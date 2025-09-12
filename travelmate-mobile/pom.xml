@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>com.travelmate</groupId>
+        <artifactId>travel-mate</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    
+    <artifactId>travelmate-mobile</artifactId>
+    <packaging>pom</packaging>
+    
+    <name>TravelMate Mobile App</name>
+    <description>React Native Mobile App for TravelMate application</description>
+    
+    <properties>
+        <frontend.working.directory>${project.basedir}</frontend.working.directory>
+        <skip.mobile.build>false</skip.mobile.build>
+    </properties>
+    
+    <dependencies>
+        <!-- Shared Module -->
+        <dependency>
+            <groupId>com.travelmate</groupId>
+            <artifactId>travelmate-shared</artifactId>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <!-- Frontend Maven Plugin for React Native -->
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <configuration>
+                    <workingDirectory>${frontend.working.directory}</workingDirectory>
+                </configuration>
+                <executions>
+                    <!-- Install Node.js and npm -->
+                    <execution>
+                        <id>install-node-and-npm</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                    </execution>
+                    
+                    <!-- Install npm dependencies -->
+                    <execution>
+                        <id>npm-install</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>install</arguments>
+                            <skip>${skip.mobile.build}</skip>
+                        </configuration>
+                    </execution>
+                    
+                    <!-- Run tests -->
+                    <execution>
+                        <id>npm-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>test</arguments>
+                            <skip>${skip.mobile.build}</skip>
+                        </configuration>
+                    </execution>
+                    
+                    <!-- Build Android APK (if needed) -->
+                    <execution>
+                        <id>build-android</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <configuration>
+                            <arguments>run android:build</arguments>
+                            <skip>${skip.mobile.build}</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            
+            <!-- Copy mobile build artifacts -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-mobile-build</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.parent.basedir}/target/mobile</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/android/app/build/outputs/apk</directory>
+                                    <includes>
+                                        <include>**/*.apk</include>
+                                    </includes>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                            <skip>${skip.mobile.build}</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    
+    <profiles>
+        <!-- Development profile - skip mobile build -->
+        <profile>
+            <id>dev</id>
+            <properties>
+                <skip.mobile.build>true</skip.mobile.build>
+            </properties>
+        </profile>
+        
+        <!-- Mobile development profile -->
+        <profile>
+            <id>mobile-dev</id>
+            <properties>
+                <skip.mobile.build>false</skip.mobile.build>
+            </properties>
+        </profile>
+    </profiles>
+</project>

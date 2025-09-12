@@ -2,7 +2,35 @@
   "permissions": {
     "allow": [
       "Bash(git remote add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(git fetch:*)",
+      "Bash(tree:*)",
+      "Bash(cat:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(mvn:*)",
+      "Bash(npm start)",
+      "Bash(where mvn)",
+      "Bash(curl:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist)",
+      "Bash(PORT=3001 npm start)",
+      "Bash(PORT=3002 npm start)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(PORT=3005 npm start)",
+      "Bash(npm install:*)",
+      "Bash(PORT=3006 npm start)",
+      "Bash(javac:*)",
+      "Bash(find:*)",
+      "Bash(java:*)",
+      "Bash(dir:*)",
+      "Bash(where java)",
+      "Bash(cmd.exe /c mvnw.cmd spring-boot:run -DskipTests)",
+      "Bash(choco install:*)",
+      "Read(//c/**)"
     ],
     "deny": []
   }
