@@ -2,6 +2,7 @@ package com.travelmate.service;
 
 import com.travelmate.dto.UserDto;
 import com.travelmate.entity.User;
+import com.travelmate.exception.UserException;
 import com.travelmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,14 +27,15 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserReviewRepository userReviewRepository;
+    private final EmailService emailService;
     
     public UserDto.Response registerUser(UserDto.RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("이미 존재하는 이메일입니다.");
+            throw new UserException("이미 존재하는 이메일입니다.");
         }
         
         if (userRepository.existsByNickname(request.getNickname())) {
-            throw new RuntimeException("이미 존재하는 닉네임입니다.");
+            throw new UserException("이미 존재하는 닉네임입니다.");
         }
         
         User user = new User();
@@ -48,8 +50,55 @@ public class UserService {
         
         User savedUser = userRepository.save(user);
         log.info("새로운 사용자 등록: {}", savedUser.getEmail());
-        
+
+        // 이메일 인증 발송
+        emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getFullName());
+
         return convertToDto(savedUser);
+    }
+
+    public boolean verifyEmail(String token) {
+        String email = emailService.getEmailByToken(token);
+        if (email == null) {
+            return false;
+        }
+
+        boolean verified = emailService.verifyEmail(token);
+        if (verified) {
+            User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserException("사용자를 찾을 수 없습니다."));
+            user.setIsEmailVerified(true);
+            userRepository.save(user);
+            log.info("이메일 인증 완료: {}", email);
+        }
+        return verified;
+    }
+
+    public void requestPasswordReset(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UserException("해당 이메일로 등록된 사용자가 없습니다."));
+
+        emailService.sendPasswordResetEmail(email);
+        log.info("비밀번호 재설정 요청: {}", email);
+    }
+
+    public void resetPassword(String token, String newPassword) {
+        String email = emailService.getEmailByToken(token);
+        if (email == null) {
+            throw new UserException("유효하지 않은 토큰입니다.");
+        }
+
+        boolean verified = emailService.verifyEmail(token);
+        if (!verified) {
+            throw new UserException("만료되었거나 유효하지 않은 토큰입니다.");
+        }
+
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UserException("사용자를 찾을 수 없습니다."));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("비밀번호 재설정 완료: {}", email);
     }
     
     public UserDto.LoginResponse loginUser(UserDto.LoginRequest request) {
@@ -57,7 +106,7 @@ public class UserService {
             .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
         
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+            throw new UserException("비밀번호가 일치하지 않습니다.");
         }
         
         String token = jwtService.generateToken(user.getId(), user.getEmail());
@@ -130,19 +179,39 @@ public class UserService {
             .map(this::convertToDto)
             .collect(Collectors.toList());
     }
-    
+
+    @Transactional(readOnly = true)
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsByNickname(String nickname) {
+        return userRepository.existsByNickname(nickname);
+    }
+
     private UserDto.Response convertToDto(User user) {
-        UserDto.Response dto = new UserDto.Response();
-        dto.setId(user.getId());
-        dto.setEmail(user.getEmail());
-        dto.setNickname(user.getNickname());
-        dto.setProfileImageUrl(user.getProfileImageUrl());
-        dto.setBio(user.getBio());
-        dto.setCurrentLatitude(user.getCurrentLatitude());
-        dto.setCurrentLongitude(user.getCurrentLongitude());
-        dto.setTravelStyle(user.getTravelStyle());
-        dto.setCreatedAt(user.getCreatedAt());
-        return dto;
+        return UserDto.Response.builder()
+            .id(user.getId())
+            .email(user.getEmail())
+            .nickname(user.getNickname())
+            .fullName(user.getFullName())
+            .age(user.getAge())
+            .gender(user.getGender())
+            .profileImageUrl(user.getProfileImageUrl())
+            .bio(user.getBio())
+            .currentLatitude(user.getCurrentLatitude())
+            .currentLongitude(user.getCurrentLongitude())
+            .travelStyle(user.getTravelStyle())
+            .interests(user.getInterests())
+            .languages(user.getLanguages())
+            .rating(user.getRating())
+            .reviewCount(user.getReviewCount())
+            .isEmailVerified(user.getIsEmailVerified())
+            .phoneVerified(user.getPhoneVerified())
+            .lastActivityAt(user.getLastActivityAt())
+            .createdAt(user.getCreatedAt())
+            .build();
     }
     
     private Long getCurrentUserId() {
@@ -163,7 +232,7 @@ public class UserService {
         
         if (request.getNickname() != null && !request.getNickname().equals(user.getNickname())) {
             if (userRepository.existsByNickname(request.getNickname())) {
-                throw new RuntimeException("이미 존재하는 닉네임입니다.");
+                throw new UserException("이미 존재하는 닉네임입니다.");
             }
             user.setNickname(request.getNickname());
         }
@@ -223,7 +292,7 @@ public class UserService {
     
     @Transactional(readOnly = true)
     public List<UserDto.ReviewResponse> getUserReviews(Long userId) {
-        List<UserReview> reviews = userReviewRepository.findByReviewedUserId(userId);
+        List<UserReview> reviews = userReviewRepository.findByRevieweeId(userId);
         
         return reviews.stream()
             .map(this::convertToReviewDto)
@@ -238,13 +307,13 @@ public class UserService {
             .orElseThrow(() -> new RuntimeException("리뷰 대상자를 찾을 수 없습니다."));
         
         // 중복 리뷰 체크
-        if (userReviewRepository.existsByReviewerIdAndReviewedUserId(reviewerId, request.getReviewedUserId())) {
-            throw new RuntimeException("이미 해당 사용자에 대한 리뷰를 작성했습니다.");
+        if (userReviewRepository.existsByReviewerIdAndRevieweeId(reviewerId, request.getReviewedUserId())) {
+            throw new UserException("이미 해당 사용자에 대한 리뷰를 작성했습니다.");
         }
         
         UserReview review = new UserReview();
         review.setReviewer(reviewer);
-        review.setReviewedUser(reviewed);
+        review.setReviewee(reviewed);
         review.setRating(request.getRating());
         review.setComment(request.getComment());
         

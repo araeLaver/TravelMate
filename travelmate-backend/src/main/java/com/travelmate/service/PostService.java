@@ -175,7 +175,7 @@ public class PostService {
         List<String> imageUrls = new ArrayList<>();
         
         for (MultipartFile image : images) {
-            String imageUrl = fileUploadService.uploadFile(image);
+            String imageUrl = fileUploadService.uploadImage(image);
             imageUrls.add(imageUrl);
             
             PostImage postImage = new PostImage();

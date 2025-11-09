@@ -11,18 +11,18 @@ import java.util.List;
 @Repository
 public interface UserReviewRepository extends JpaRepository<UserReview, Long> {
     
-    List<UserReview> findByReviewedUserId(Long reviewedUserId);
-    
+    List<UserReview> findByRevieweeId(Long revieweeId);
+
     List<UserReview> findByReviewerId(Long reviewerId);
+
+    boolean existsByReviewerIdAndRevieweeId(Long reviewerId, Long revieweeId);
     
-    boolean existsByReviewerIdAndReviewedUserId(Long reviewerId, Long reviewedUserId);
-    
-    @Query("SELECT AVG(r.rating) FROM UserReview r WHERE r.reviewedUser.id = :userId")
+    @Query("SELECT AVG(r.rating) FROM UserReview r WHERE r.reviewee.id = :userId")
     Double getAverageRatingByUserId(@Param("userId") Long userId);
-    
-    @Query("SELECT COUNT(r) FROM UserReview r WHERE r.reviewedUser.id = :userId")
+
+    @Query("SELECT COUNT(r) FROM UserReview r WHERE r.reviewee.id = :userId")
     Integer getReviewCountByUserId(@Param("userId") Long userId);
-    
-    @Query("SELECT r FROM UserReview r WHERE r.reviewedUser.id = :userId ORDER BY r.createdAt DESC")
-    List<UserReview> findByReviewedUserIdOrderByCreatedAtDesc(@Param("userId") Long userId);
+
+    @Query("SELECT r FROM UserReview r WHERE r.reviewee.id = :userId ORDER BY r.createdAt DESC")
+    List<UserReview> findByRevieweeIdOrderByCreatedAtDesc(@Param("userId") Long userId);
 }

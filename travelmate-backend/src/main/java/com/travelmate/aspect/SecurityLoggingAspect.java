@@ -74,8 +74,8 @@ public class SecurityLoggingAspect {
     /**
      * 관리자 기능 접근 로깅
      */
-    @Before("execution(* com.travelmate.controller..*(..) && " +
-           "within(@org.springframework.security.access.prepost.PreAuthorize *))")
+    @Before("execution(* com.travelmate.controller..*(..)) && " +
+           "within(@org.springframework.security.access.prepost.PreAuthorize *)")
     public void logAdminAccess(JoinPoint joinPoint) {
         HttpServletRequest request = getCurrentRequest();
         if (request == null) return;

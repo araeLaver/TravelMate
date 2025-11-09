@@ -44,7 +44,7 @@ public class User {
     @Column(name = "nickname", unique = true, nullable = false, length = 50)
     private String nickname;
     
-    @Column(name = "full_name", nullable = false, length = 100)
+    @Column(name = "full_name", nullable = true, length = 100)
     private String fullName;
     
     @Column(name = "age")
@@ -101,7 +101,7 @@ public class User {
     @Column(name = "is_email_verified", nullable = false)
     private Boolean isEmailVerified = false;
     
-    @Column(name = "rating", precision = 3, scale = 2)
+    @Column(name = "rating")
     private Double rating = 0.0;
     
     @Column(name = "review_count")
@@ -140,20 +140,24 @@ public class User {
     
     @Column(name = "privacy_location_visible", nullable = false)
     private Boolean privacyLocationVisible = true;
-    
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role = Role.USER;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RefreshToken> refreshTokens;
-    
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<LoginHistory> loginHistories;
-    
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private TwoFactorAuth twoFactorAuth;
-    
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
@@ -168,6 +172,10 @@ public class User {
     
     public enum AuthProvider {
         LOCAL, GOOGLE, KAKAO, NAVER, FACEBOOK
+    }
+
+    public enum Role {
+        USER, ADMIN, MODERATOR
     }
     
     public boolean isAccountLocked() {
@@ -191,5 +199,13 @@ public class User {
             return true;
         }
         return passwordChangedAt.isBefore(LocalDateTime.now().minusDays(90));
+    }
+
+    public Double getRatingAverage() {
+        return this.rating;
+    }
+
+    public String getName() {
+        return this.fullName;
     }
 }

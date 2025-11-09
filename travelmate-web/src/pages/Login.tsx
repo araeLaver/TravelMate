@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { realSocialLoginService } from '../services/realSocialLoginService';
+import { authService } from '../services/authService';
 import './Auth.css';
 
 const Login: React.FC = () => {
@@ -9,18 +10,25 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // TODO: 실제 로그인 API 호출
-    console.log('Login attempt:', { email, password });
-    
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+
+    try {
+      const response = await authService.login({ email, password });
+      console.log('Login successful:', response);
+      alert(`✅ 로그인 성공! 환영합니다, ${response.user.nickname}님!`);
       navigate('/dashboard');
-    }, 1000);
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setError(error.message || '로그인에 실패했습니다.');
+      alert(`❌ ${error.message || '로그인에 실패했습니다.'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
@@ -116,12 +124,13 @@ const Login: React.FC = () => {
           </button>
         </form>
 
-        <div className="auth-divider">
+        {/* 소셜 로그인 - 백엔드 구현 완료 후 활성화 예정 */}
+        {/* <div className="auth-divider">
           <span>또는</span>
         </div>
 
         <div className="social-login">
-          <button 
+          <button
             className="social-btn google"
             onClick={handleGoogleLogin}
             disabled={socialLoading !== null}
@@ -129,7 +138,7 @@ const Login: React.FC = () => {
             <span>🔵</span>
             {socialLoading === 'google' ? '구글 로그인 중...' : 'Google로 로그인'}
           </button>
-          <button 
+          <button
             className="social-btn kakao"
             onClick={handleKakaoLogin}
             disabled={socialLoading !== null}
@@ -137,7 +146,7 @@ const Login: React.FC = () => {
             <span>🟡</span>
             {socialLoading === 'kakao' ? '카카오 로그인 중...' : 'KakaoTalk으로 로그인'}
           </button>
-          <button 
+          <button
             className="social-btn naver"
             onClick={handleNaverLogin}
             disabled={socialLoading !== null}
@@ -145,7 +154,7 @@ const Login: React.FC = () => {
             <span>🟢</span>
             {socialLoading === 'naver' ? '네이버 로그인 중...' : 'Naver로 로그인'}
           </button>
-        </div>
+        </div> */}
 
         <div className="auth-footer">
           <p>

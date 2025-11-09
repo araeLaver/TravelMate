@@ -268,11 +268,11 @@ public class ChatService {
     }
     
     private UserDto.Response convertUserToDto(User user) {
-        UserDto.Response dto = new UserDto.Response();
-        dto.setId(user.getId());
-        dto.setNickname(user.getNickname());
-        dto.setProfileImageUrl(user.getProfileImageUrl());
-        return dto;
+        return UserDto.Response.builder()
+            .id(user.getId())
+            .nickname(user.getNickname())
+            .profileImageUrl(user.getProfileImageUrl())
+            .build();
     }
     
     @Transactional(readOnly = true)

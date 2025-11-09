@@ -31,7 +31,7 @@ export class LocationDebugger {
 
   static async testLocationAccess(): Promise<void> {
     console.log('🧪 위치 접근 테스트 시작...');
-    
+
     if (!this.checkGeolocationSupport()) {
       console.log('❌ 브라우저가 위치 서비스를 지원하지 않습니다.');
       return;
@@ -43,12 +43,12 @@ export class LocationDebugger {
 
     await this.checkLocationPermission();
 
-    return new Promise((resolve) => {
+    return new Promise<void>((resolveLocationTest) => {
       console.log('📍 위치 정보 요청 중...');
-      
+
       const timeoutId = setTimeout(() => {
         console.log('⏰ 위치 요청 타임아웃 (10초)');
-        resolve();
+        resolveLocationTest();
       }, 10000);
 
       navigator.geolocation.getCurrentPosition(
@@ -60,14 +60,14 @@ export class LocationDebugger {
             정확도: position.coords.accuracy + 'm',
             시간: new Date(position.timestamp).toLocaleString('ko-KR')
           });
-          resolve();
+          resolveLocationTest();
         },
         (error) => {
           clearTimeout(timeoutId);
           console.log('❌ 위치 정보 실패:');
           console.log('- 에러 코드:', error.code);
           console.log('- 에러 메시지:', error.message);
-          
+
           switch (error.code) {
             case 1:
               console.log('🚫 사용자가 위치 접근을 거부했습니다.');
@@ -82,7 +82,7 @@ export class LocationDebugger {
               console.log('💡 해결 방법: 네트워크 연결을 확인하고 다시 시도하세요.');
               break;
           }
-          resolve();
+          resolveLocationTest();
         },
         {
           enableHighAccuracy: true,

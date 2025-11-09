@@ -12,12 +12,12 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "group_members",
     indexes = {
-        @Index(name = "idx_group_members_group_id", columnList = "group_id"),
+        @Index(name = "idx_group_members_travel_group_id", columnList = "travel_group_id"),
         @Index(name = "idx_group_members_user_id", columnList = "user_id"),
         @Index(name = "idx_group_members_status", columnList = "status")
     },
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_group_user", columnNames = {"group_id", "user_id"})
+        @UniqueConstraint(name = "uk_travel_group_user", columnNames = {"travel_group_id", "user_id"})
     }
 )
 @EntityListeners(AuditingEntityListener.class)
@@ -31,8 +31,8 @@ public class GroupMember {
     private Long id;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", nullable = false)
-    private TravelGroup group;
+    @JoinColumn(name = "travel_group_id", nullable = false)
+    private TravelGroup travelGroup;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

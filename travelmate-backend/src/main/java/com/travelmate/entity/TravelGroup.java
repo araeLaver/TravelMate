@@ -54,7 +54,7 @@ public class TravelGroup {
     @JoinColumn(name = "creator_id", nullable = false)
     private User creator;
     
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "travelGroup", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<GroupMember> members;
     
     @Column(name = "max_members", nullable = false)
@@ -75,6 +75,26 @@ public class TravelGroup {
     
     @Column(name = "meeting_location", length = 200)
     private String meetingLocation;
+
+    @Column(name = "meeting_latitude")
+    private Double meetingLatitude;
+
+    @Column(name = "meeting_longitude")
+    private Double meetingLongitude;
+
+    @Column(name = "meeting_address", length = 200)
+    private String meetingAddress;
+
+    @Column(name = "scheduled_time")
+    private LocalDateTime scheduledTime;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", length = 50)
+    private Purpose purpose;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 50, nullable = false)
+    private Status status = Status.RECRUITING;
     
     @Column(name = "requirements", columnDefinition = "TEXT")
     private String requirements;
@@ -92,4 +112,20 @@ public class TravelGroup {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public enum Purpose {
+        LEISURE,
+        BUSINESS,
+        EDUCATION,
+        MEDICAL,
+        FAMILY,
+        OTHER
+    }
+
+    public enum Status {
+        RECRUITING,
+        ACTIVE,
+        COMPLETED,
+        CANCELLED
+    }
 }

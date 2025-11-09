@@ -36,8 +36,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = jwtService.getUserIdFromToken(jwt);
                 String email = jwtService.getEmailFromToken(jwt);
                 
-                UsernamePasswordAuthenticationToken authentication = 
-                    new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+                UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(userId.toString(), null, Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -57,5 +57,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+
+        boolean skip = path.equals("/users/register") ||
+                       path.equals("/users/login") ||
+                       path.startsWith("/location/") ||
+                       path.startsWith("/h2-console") ||
+                       path.startsWith("/uploads") ||
+                       path.startsWith("/ws") ||
+                       path.equals("/error") ||
+                       "OPTIONS".equals(method);
+
+        log.debug("JWT Filter check - Path: {}, Method: {}, Skip: {}", path, method, skip);
+
+        return skip;
     }
 }

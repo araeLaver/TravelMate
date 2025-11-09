@@ -176,7 +176,7 @@
     </springProfile>
 
     <!-- 기본 루트 로거 -->
-    <springProfile name="!prod & !test & !dev">
+    <springProfile name="!prod &amp; !test &amp; !dev">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>

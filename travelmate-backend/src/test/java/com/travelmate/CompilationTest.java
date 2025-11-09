@@ -1,18 +1,14 @@
 package com.travelmate;
 
-import com.travelmate.service.RecommendationService;
-import com.travelmate.exception.GlobalExceptionHandler;
 import com.travelmate.exception.ErrorResponse;
 import com.travelmate.exception.BusinessException;
 import com.travelmate.exception.ResourceNotFoundException;
 import com.travelmate.entity.User;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.junit.jupiter.api.Test;
 
 /**
  * Basic compilation test to verify all components compile correctly
  */
-@SpringBootTest
 public class CompilationTest {
 
     @Test

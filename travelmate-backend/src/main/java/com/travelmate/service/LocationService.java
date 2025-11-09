@@ -169,13 +169,13 @@ public class LocationService {
     }
     
     private UserDto.Response convertToDto(User user) {
-        UserDto.Response dto = new UserDto.Response();
-        dto.setId(user.getId());
-        dto.setNickname(user.getNickname());
-        dto.setProfileImageUrl(user.getProfileImageUrl());
-        dto.setTravelStyle(user.getTravelStyle());
-        dto.setCurrentLatitude(user.getCurrentLatitude());
-        dto.setCurrentLongitude(user.getCurrentLongitude());
-        return dto;
+        return UserDto.Response.builder()
+            .id(user.getId())
+            .nickname(user.getNickname())
+            .profileImageUrl(user.getProfileImageUrl())
+            .travelStyle(user.getTravelStyle())
+            .currentLatitude(user.getCurrentLatitude())
+            .currentLongitude(user.getCurrentLongitude())
+            .build();
     }
 }

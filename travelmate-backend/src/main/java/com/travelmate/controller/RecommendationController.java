@@ -7,7 +7,6 @@ import com.travelmate.service.AdvancedRecommendationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,38 +24,38 @@ public class RecommendationController {
     
     @GetMapping("/users")
     public ResponseEntity<List<UserDto.Response>> getRecommendedUsers(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String userId,
             @RequestParam Double latitude,
             @RequestParam Double longitude) {
-        Long userId = Long.parseLong(userDetails.getUsername());
-        List<UserDto.Response> recommendations = locationService.getSmartRecommendations(userId, latitude, longitude);
+        Long userIdLong = Long.parseLong(userId);
+        List<UserDto.Response> recommendations = locationService.getSmartRecommendations(userIdLong, latitude, longitude);
         return ResponseEntity.ok(recommendations);
     }
     
     @GetMapping("/personalized")
     public ResponseEntity<List<UserDto.Response>> getPersonalizedRecommendations(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+            @AuthenticationPrincipal String userId) {
+        Long userIdLong = Long.parseLong(userId);
         List<UserDto.Response> recommendations = advancedRecommendationService
-            .getPersonalizedRecommendations(userId);
+            .getPersonalizedRecommendations(userIdLong);
         return ResponseEntity.ok(recommendations);
     }
     
     @GetMapping("/activity")
     public ResponseEntity<List<UserDto.Response>> getActivityBasedRecommendations(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String userId,
             @RequestParam String activity) {
-        Long userId = Long.parseLong(userDetails.getUsername());
+        Long userIdLong = Long.parseLong(userId);
         List<UserDto.Response> recommendations = advancedRecommendationService
-            .getActivityBasedRecommendations(userId, activity);
+            .getActivityBasedRecommendations(userIdLong, activity);
         return ResponseEntity.ok(recommendations);
     }
     
     @PostMapping("/intelligent-matching")
     public ResponseEntity<Void> performIntelligentMatching(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        Long userId = Long.parseLong(userDetails.getUsername());
-        advancedRecommendationService.performIntelligentMatching(userId);
+            @AuthenticationPrincipal String userId) {
+        Long userIdLong = Long.parseLong(userId);
+        advancedRecommendationService.performIntelligentMatching(userIdLong);
         return ResponseEntity.ok().build();
     }
     

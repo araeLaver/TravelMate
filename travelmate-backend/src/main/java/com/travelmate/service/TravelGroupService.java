@@ -5,11 +5,13 @@ import com.travelmate.dto.UserDto;
 import com.travelmate.entity.GroupMember;
 import com.travelmate.entity.TravelGroup;
 import com.travelmate.entity.User;
+import com.travelmate.exception.TravelGroupException;
 import com.travelmate.repository.GroupMemberRepository;
 import com.travelmate.repository.TravelGroupRepository;
 import com.travelmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,9 @@ public class TravelGroupService {
         TravelGroup group = new TravelGroup();
         group.setTitle(request.getTitle());
         group.setDescription(request.getDescription());
+        group.setDestination(request.getDestination());
+        group.setStartDate(request.getStartDate());
+        group.setEndDate(request.getEndDate());
         group.setPurpose(request.getPurpose());
         group.setCreator(creator);
         group.setMaxMembers(request.getMaxMembers());
@@ -72,7 +77,7 @@ public class TravelGroupService {
     @Transactional(readOnly = true)
     public TravelGroupDto.DetailResponse getGroupDetail(Long groupId) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         TravelGroupDto.DetailResponse response = new TravelGroupDto.DetailResponse();
         
@@ -115,7 +120,7 @@ public class TravelGroupService {
     
     public void joinGroup(Long groupId, Long userId) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
@@ -167,7 +172,7 @@ public class TravelGroupService {
     
     public void updateGroupStatus(Long groupId, Long userId, TravelGroup.Status status) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         // 그룹 생성자만 상태 변경 가능
         if (!group.getCreator().getId().equals(userId)) {
@@ -237,12 +242,12 @@ public class TravelGroupService {
     }
     
     private UserDto.Response convertUserToDto(User user) {
-        UserDto.Response dto = new UserDto.Response();
-        dto.setId(user.getId());
-        dto.setNickname(user.getNickname());
-        dto.setProfileImageUrl(user.getProfileImageUrl());
-        dto.setTravelStyle(user.getTravelStyle());
-        return dto;
+        return UserDto.Response.builder()
+            .id(user.getId())
+            .nickname(user.getNickname())
+            .profileImageUrl(user.getProfileImageUrl())
+            .travelStyle(user.getTravelStyle())
+            .build();
     }
     
     private Long getCurrentUserId() {
@@ -261,7 +266,7 @@ public class TravelGroupService {
     
     public TravelGroupDto.Response updateGroup(Long groupId, Long userId, TravelGroupDto.UpdateRequest request) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         // 그룹 생성자만 수정 가능
         if (!group.getCreator().getId().equals(userId)) {
@@ -298,7 +303,7 @@ public class TravelGroupService {
     
     public void deleteGroup(Long groupId, Long userId) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         // 그룹 생성자만 삭제 가능
         if (!group.getCreator().getId().equals(userId)) {
@@ -323,7 +328,7 @@ public class TravelGroupService {
     
     public void inviteToGroup(Long groupId, Long inviterId, TravelGroupDto.InviteRequest request) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         User inviter = userRepository.findById(inviterId)
             .orElseThrow(() -> new RuntimeException("초대자를 찾을 수 없습니다."));
@@ -350,7 +355,7 @@ public class TravelGroupService {
     @Transactional(readOnly = true)
     public List<TravelGroupDto.MemberResponse> getGroupMembers(Long groupId) {
         TravelGroup group = travelGroupRepository.findById(groupId)
-            .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            .orElseThrow(() -> new TravelGroupException("그룹을 찾을 수 없습니다.", HttpStatus.NOT_FOUND));
         
         return group.getMembers().stream()
             .filter(m -> m.getStatus() == GroupMember.Status.ACCEPTED)

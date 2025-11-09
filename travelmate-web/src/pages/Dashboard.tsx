@@ -26,19 +26,19 @@ const Dashboard: React.FC = () => {
 
   const initializeLocation = async () => {
     console.log('🌍 위치 정보를 가져오는 중...');
-    
+
     // 위치 디버깅 정보 표시
     await LocationDebugger.testLocationAccess();
-    
+
     const location = await locationService.getCurrentLocation();
     console.log('✅ 위치 정보 가져오기 완료:', location);
-    
+
     setCurrentLocation(location);
-    
+
     // 실제 GPS 위치인지 기본 위치인지 확인
     const isActualGPS = location.latitude !== 37.5665 || location.longitude !== 126.9780;
     setIsLocationEnabled(isActualGPS);
-    
+
     console.log(isActualGPS ? '🟢 실제 GPS 위치 사용' : '🟡 기본 위치 사용');
   };
 
@@ -88,6 +88,51 @@ const Dashboard: React.FC = () => {
     await initializeLocation();
   };
 
+  const setManualLocation = async () => {
+    console.log('🎯 경기광주 위치로 수동 설정');
+
+    // 경기도 광주시의 정확한 좌표
+    const gwangjuLocation = {
+      latitude: 37.4138,
+      longitude: 127.2557,
+      address: '경기도 광주시 (수동 설정)'
+    };
+
+    // 카카오맵 API로 정확한 주소 가져오기 시도
+    try {
+      const addressResult = await locationService.getCurrentLocation();
+      // 임시로 좌표를 교체하여 주소를 가져옴
+      const originalLat = addressResult.latitude;
+      const originalLng = addressResult.longitude;
+
+      // locationService의 getAddressFromCoords를 직접 호출할 수 없으므로
+      // 백엔드 API를 직접 호출
+      const response = await fetch(
+        `http://localhost:8080/api/location/address?lat=${gwangjuLocation.latitude}&lng=${gwangjuLocation.longitude}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.documents && data.documents.length > 0) {
+          const doc = data.documents[0];
+          if (doc.road_address && doc.road_address.address_name) {
+            gwangjuLocation.address = doc.road_address.address_name;
+          } else if (doc.address && doc.address.address_name) {
+            gwangjuLocation.address = doc.address.address_name;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('주소 조회 실패, 기본 주소 사용:', error);
+    }
+
+    setCurrentLocation(gwangjuLocation);
+    setIsLocationEnabled(true);
+
+    console.log('✅ 경기광주 위치로 설정 완료:', gwangjuLocation);
+    alert('✅ 위치가 경기도 광주시로 설정되었습니다!');
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -130,10 +175,13 @@ const Dashboard: React.FC = () => {
               <div className="location-address">
                 {currentLocation.address || `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}`}
               </div>
+              <div className="location-debug" style={{fontSize: '0.8rem', color: '#666', marginTop: '0.5rem'}}>
+                🔧 디버그: {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+              </div>
               <div className="search-radius">
-                🔍 검색 반경: 
-                <select 
-                  value={searchRadius} 
+                🔍 검색 반경:
+                <select
+                  value={searchRadius}
                   onChange={(e) => setSearchRadius(Number(e.target.value))}
                   className="radius-select"
                 >
@@ -149,22 +197,41 @@ const Dashboard: React.FC = () => {
                   <div style={{color: '#888', fontStyle: 'italic', marginBottom: '0.5rem'}}>
                     💡 더 정확한 위치를 원하시면 브라우저에서 위치 권한을 허용해주세요!
                   </div>
-                  <button 
-                    onClick={requestLocationPermission}
-                    style={{
-                      padding: '0.3rem 0.8rem',
-                      fontSize: '0.8rem',
-                      backgroundColor: '#007bff',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📍 위치 권한 요청
-                  </button>
+                  <div style={{display: 'flex', gap: '0.5rem', flexWrap: 'wrap'}}>
+                    <button
+                      onClick={requestLocationPermission}
+                      style={{
+                        padding: '0.3rem 0.8rem',
+                        fontSize: '0.8rem',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📍 위치 권한 요청
+                    </button>
+                    <button
+                      onClick={setManualLocation}
+                      style={{
+                        padding: '0.3rem 0.8rem',
+                        fontSize: '0.8rem',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🎯 경기광주로 설정
+                    </button>
+                  </div>
                 </div>
               )}
+              <div style={{fontSize: '0.75rem', color: '#999', marginTop: '0.5rem', fontStyle: 'italic'}}>
+                💡 F12 → Console 탭에서 위치 정보 디버깅 확인 가능
+              </div>
             </div>
           </div>
         </div>
