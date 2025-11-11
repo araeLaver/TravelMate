@@ -1,3 +1,5 @@
+import { apiClient } from './apiClient';
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -96,14 +98,25 @@ export interface UpdateProfileRequest {
 }
 
 class ProfileService {
+  private useMock: boolean = false; // Mock 데이터 사용 여부
   private profile: UserProfile | null = null;
   private currentUserId: string;
 
   constructor() {
     this.currentUserId = localStorage.getItem('tempUserId') || this.generateUserId();
     localStorage.setItem('tempUserId', this.currentUserId);
-    
-    this.loadProfile();
+
+    if (this.useMock) {
+      this.loadProfile();
+    }
+  }
+
+  // Mock 모드 설정
+  setMockMode(useMock: boolean): void {
+    this.useMock = useMock;
+    if (useMock) {
+      this.loadProfile();
+    }
   }
 
   private generateUserId(): string {
@@ -201,40 +214,71 @@ class ProfileService {
   }
 
   // 프로필 조회
-  getProfile(): UserProfile | null {
-    return this.profile;
+  async getProfile(userId?: string): Promise<UserProfile | null> {
+    if (this.useMock) {
+      return this.profile;
+    }
+
+    try {
+      const endpoint = userId ? `/users/profile/${userId}` : '/users/me';
+      const response = await apiClient.get<any>(endpoint);
+      return this.mapToUserProfile(response);
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+      return null;
+    }
   }
 
   // 프로필 업데이트
-  updateProfile(updates: UpdateProfileRequest): UserProfile {
-    if (!this.profile) {
-      this.profile = this.createDefaultProfile();
+  async updateProfile(updates: UpdateProfileRequest): Promise<UserProfile> {
+    if (this.useMock) {
+      if (!this.profile) {
+        this.profile = this.createDefaultProfile();
+      }
+
+      // 업데이트 적용
+      Object.keys(updates).forEach(key => {
+        const updateKey = key as keyof UpdateProfileRequest;
+        if (updates[updateKey] !== undefined) {
+          if (updateKey === 'preferences' && updates.preferences) {
+            this.profile!.preferences = {
+              ...this.profile!.preferences,
+              ...updates.preferences
+            };
+          } else if (updateKey === 'socialLinks' && updates.socialLinks) {
+            this.profile!.socialLinks = {
+              ...this.profile!.socialLinks,
+              ...updates.socialLinks
+            };
+          } else {
+            (this.profile as any)[updateKey] = updates[updateKey];
+          }
+        }
+      });
+
+      this.profile.lastActive = new Date();
+      this.saveProfile();
+
+      return this.profile;
     }
 
-    // 업데이트 적용
-    Object.keys(updates).forEach(key => {
-      const updateKey = key as keyof UpdateProfileRequest;
-      if (updates[updateKey] !== undefined) {
-        if (updateKey === 'preferences' && updates.preferences) {
-          this.profile!.preferences = {
-            ...this.profile!.preferences,
-            ...updates.preferences
-          };
-        } else if (updateKey === 'socialLinks' && updates.socialLinks) {
-          this.profile!.socialLinks = {
-            ...this.profile!.socialLinks,
-            ...updates.socialLinks
-          };
-        } else {
-          (this.profile as any)[updateKey] = updates[updateKey];
-        }
-      }
-    });
-
-    this.profile.lastActive = new Date();
-    this.saveProfile();
-
-    return this.profile;
+    try {
+      const response = await apiClient.put<any>('/users/profile', {
+        nickname: updates.name,
+        fullName: updates.name,
+        age: updates.age,
+        gender: updates.gender?.toUpperCase(),
+        bio: updates.bio,
+        profileImageUrl: updates.profileImage,
+        interests: updates.interests,
+        languages: updates.languages,
+        travelStyle: updates.travelStyle,
+      });
+      return this.mapToUserProfile(response);
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw error;
+    }
   }
 
   // 여행 기록 추가
@@ -308,18 +352,42 @@ class ProfileService {
   }
 
   // 프로필 이미지 업데이트
-  updateProfileImage(imageUrl: string): void {
-    if (this.profile) {
-      this.profile.profileImage = imageUrl;
-      this.saveProfile();
+  async updateProfileImage(file: File): Promise<string> {
+    if (this.useMock) {
+      const imageUrl = URL.createObjectURL(file);
+      if (this.profile) {
+        this.profile.profileImage = imageUrl;
+        this.saveProfile();
+      }
+      return imageUrl;
+    }
+
+    try {
+      const response = await apiClient.uploadFile('/upload/profile-image', file);
+      return response.url || response.imageUrl;
+    } catch (error) {
+      console.error('Failed to upload profile image:', error);
+      throw error;
     }
   }
 
   // 커버 이미지 업데이트
-  updateCoverImage(imageUrl: string): void {
-    if (this.profile) {
-      this.profile.coverImage = imageUrl;
-      this.saveProfile();
+  async updateCoverImage(file: File): Promise<string> {
+    if (this.useMock) {
+      const imageUrl = URL.createObjectURL(file);
+      if (this.profile) {
+        this.profile.coverImage = imageUrl;
+        this.saveProfile();
+      }
+      return imageUrl;
+    }
+
+    try {
+      const response = await apiClient.uploadFile('/upload/cover-image', file);
+      return response.url || response.imageUrl;
+    } catch (error) {
+      console.error('Failed to upload cover image:', error);
+      throw error;
     }
   }
 
@@ -369,6 +437,53 @@ class ProfileService {
       '배낭여행', '럭셔리 여행', '문화탐방', '모험가', '미식가',
       '사진가', '역사덕후', '자연러버', '도시탐험', '힐링여행'
     ];
+  }
+
+  // 백엔드 응답을 UserProfile로 변환
+  private mapToUserProfile(data: any): UserProfile {
+    return {
+      id: data.id?.toString() || '',
+      name: data.nickname || data.name || '',
+      age: data.age,
+      gender: data.gender?.toLowerCase() as 'male' | 'female' | 'other',
+      bio: data.bio || '',
+      profileImage: data.profileImageUrl || data.profileImage,
+      coverImage: data.coverImageUrl || data.coverImage,
+      location: data.location,
+      interests: data.interests || [],
+      languages: data.languages || [],
+      travelStyle: data.travelStyle || '',
+      travelHistory: [],
+      stats: {
+        totalTrips: data.stats?.totalTrips || 0,
+        totalCountries: data.stats?.totalCountries || 0,
+        totalCities: data.stats?.totalCities || 0,
+        favoriteDestination: data.stats?.favoriteDestination || '아직 없음',
+        totalGroupsJoined: data.stats?.totalGroupsJoined || 0,
+        totalGroupsCreated: data.stats?.totalGroupsCreated || 0,
+        averageRating: data.rating || 0,
+        reviews: [],
+      },
+      preferences: {
+        budget: {
+          min: 100000,
+          max: 500000,
+          currency: 'KRW',
+        },
+        accommodationType: ['호텔', '게스트하우스'],
+        transportPreference: ['대중교통', '도보'],
+        groupSize: {
+          min: 2,
+          max: 6,
+        },
+        travelPace: 'medium',
+        activityLevel: 'medium',
+        foodPreferences: ['현지음식'],
+        dietaryRestrictions: [],
+      },
+      createdAt: new Date(data.createdAt),
+      lastActive: new Date(data.lastActivityAt || Date.now()),
+    };
   }
 }
 

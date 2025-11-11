@@ -36,50 +36,63 @@ const Groups: React.FC = () => {
     filterGroups();
   }, [groups, searchQuery, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadGroups = () => {
+  const loadGroups = async () => {
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
       let loadedGroups: TravelGroup[] = [];
-      
+
       switch (selectedTab) {
         case 'all':
-          loadedGroups = groupService.getAllGroups();
+          loadedGroups = await groupService.getAllGroups();
           break;
         case 'my':
-          loadedGroups = groupService.getMyGroups();
+          loadedGroups = await groupService.getMyGroups();
           break;
         case 'recommended':
-          loadedGroups = groupService.getRecommendedGroups();
+          loadedGroups = await groupService.getRecommendedGroups();
           break;
       }
-      
+
       setGroups(loadedGroups);
+    } catch (error) {
+      console.error('Failed to load groups:', error);
+      alert('그룹 목록을 불러오는데 실패했습니다.');
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
-  const filterGroups = () => {
+  const filterGroups = async () => {
     let filtered = [...groups];
 
     // 검색어 필터링
     if (searchQuery.trim()) {
-      filtered = groupService.searchGroups(searchQuery.trim());
-    }
+      try {
+        filtered = await groupService.searchGroups(searchQuery.trim(), {
+          destination: filters.destination || undefined,
+          travelStyle: filters.travelStyle && filters.travelStyle !== '전체' ? filters.travelStyle : undefined,
+          status: filters.status || undefined,
+        });
+      } catch (error) {
+        console.error('Failed to search groups:', error);
+        // 에러 발생 시 로컬 필터링 사용
+      }
+    } else {
+      // 추가 필터 적용 (검색어가 없을 때)
+      if (filters.destination) {
+        filtered = filtered.filter(group =>
+          group.destination.toLowerCase().includes(filters.destination.toLowerCase())
+        );
+      }
 
-    // 추가 필터 적용
-    if (filters.destination) {
-      filtered = filtered.filter(group => 
-        group.destination.toLowerCase().includes(filters.destination.toLowerCase())
-      );
-    }
+      if (filters.travelStyle && filters.travelStyle !== '전체') {
+        filtered = filtered.filter(group => group.travelStyle === filters.travelStyle);
+      }
 
-    if (filters.travelStyle && filters.travelStyle !== '전체') {
-      filtered = filtered.filter(group => group.travelStyle === filters.travelStyle);
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(group => group.status === filters.status);
+      if (filters.status) {
+        filtered = filtered.filter(group => group.status === filters.status);
+      }
     }
 
     setFilteredGroups(filtered);
@@ -87,10 +100,10 @@ const Groups: React.FC = () => {
 
   const handleJoinGroup = async (groupId: string) => {
     try {
-      const success = groupService.joinGroup(groupId);
+      const success = await groupService.joinGroup(groupId);
       if (success) {
         alert('그룹에 성공적으로 가입했습니다! 🎉');
-        loadGroups(); // 목록 새로고침
+        await loadGroups(); // 목록 새로고침
       }
     } catch (error) {
       alert(`가입 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
@@ -99,12 +112,12 @@ const Groups: React.FC = () => {
 
   const handleLeaveGroup = async (groupId: string) => {
     if (!window.confirm('정말 그룹에서 탈퇴하시겠습니까?')) return;
-    
+
     try {
-      const success = groupService.leaveGroup(groupId);
+      const success = await groupService.leaveGroup(groupId);
       if (success) {
         alert('그룹에서 탈퇴했습니다.');
-        loadGroups();
+        await loadGroups();
       }
     } catch (error) {
       alert(`탈퇴 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);

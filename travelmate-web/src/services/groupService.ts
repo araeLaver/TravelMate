@@ -1,3 +1,5 @@
+import { apiClient } from './apiClient';
+
 export interface TravelGroup {
   id: string;
   name: string;
@@ -52,18 +54,30 @@ export interface CreateGroupRequest {
 }
 
 class GroupService {
+  private useMock: boolean = false; // Mock 데이터 사용 여부 (개발/테스트용)
   private groups: Map<string, TravelGroup> = new Map();
   private currentUserId: string;
 
   constructor() {
     this.currentUserId = localStorage.getItem('tempUserId') || this.generateUserId();
     localStorage.setItem('tempUserId', this.currentUserId);
-    
-    this.initializeMockData();
+
+    // Mock 모드일 때만 초기 데이터 로드
+    if (this.useMock) {
+      this.initializeMockData();
+    }
   }
 
   private generateUserId(): string {
     return 'user_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  // Mock 모드 설정 (테스트용)
+  setMockMode(useMock: boolean): void {
+    this.useMock = useMock;
+    if (useMock) {
+      this.initializeMockData();
+    }
   }
 
   private initializeMockData(): void {
@@ -410,169 +424,339 @@ class GroupService {
   }
 
   // 모든 그룹 조회
-  getAllGroups(): TravelGroup[] {
-    return Array.from(this.groups.values())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  async getAllGroups(): Promise<TravelGroup[]> {
+    if (this.useMock) {
+      return Array.from(this.groups.values())
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+
+    try {
+      const response = await apiClient.get<any[]>('/groups');
+      return response.map(this.mapToTravelGroup);
+    } catch (error) {
+      console.error('Failed to fetch groups:', error);
+      throw error;
+    }
   }
 
   // 특정 그룹 조회
-  getGroup(groupId: string): TravelGroup | null {
-    return this.groups.get(groupId) || null;
+  async getGroup(groupId: string): Promise<TravelGroup | null> {
+    if (this.useMock) {
+      return this.groups.get(groupId) || null;
+    }
+
+    try {
+      const response = await apiClient.get<any>(`/groups/${groupId}`);
+      return this.mapToTravelGroup(response);
+    } catch (error) {
+      console.error('Failed to fetch group:', error);
+      return null;
+    }
   }
 
   // 그룹 검색
-  searchGroups(query: string, filters?: {
+  async searchGroups(query: string, filters?: {
     destination?: string;
     travelStyle?: string;
     status?: string;
     tags?: string[];
     dateRange?: { start: Date; end: Date };
-  }): TravelGroup[] {
-    let groups = Array.from(this.groups.values());
+  }): Promise<TravelGroup[]> {
+    if (this.useMock) {
+      let groups = Array.from(this.groups.values());
 
-    // 텍스트 검색
-    if (query.trim()) {
-      const searchTerm = query.toLowerCase();
-      groups = groups.filter(group => 
-        group.name.toLowerCase().includes(searchTerm) ||
-        group.description.toLowerCase().includes(searchTerm) ||
-        group.destination.toLowerCase().includes(searchTerm) ||
-        group.tags.some(tag => tag.toLowerCase().includes(searchTerm))
-      );
+      // 텍스트 검색
+      if (query.trim()) {
+        const searchTerm = query.toLowerCase();
+        groups = groups.filter(group =>
+          group.name.toLowerCase().includes(searchTerm) ||
+          group.description.toLowerCase().includes(searchTerm) ||
+          group.destination.toLowerCase().includes(searchTerm) ||
+          group.tags.some(tag => tag.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      // 필터 적용
+      if (filters) {
+        if (filters.destination) {
+          groups = groups.filter(group =>
+            group.destination.toLowerCase().includes(filters.destination!.toLowerCase())
+          );
+        }
+
+        if (filters.travelStyle) {
+          groups = groups.filter(group => group.travelStyle === filters.travelStyle);
+        }
+
+        if (filters.status) {
+          groups = groups.filter(group => group.status === filters.status);
+        }
+
+        if (filters.tags && filters.tags.length > 0) {
+          groups = groups.filter(group =>
+            filters.tags!.some(tag => group.tags.includes(tag))
+          );
+        }
+
+        if (filters.dateRange) {
+          groups = groups.filter(group =>
+            group.startDate >= filters.dateRange!.start &&
+            group.endDate <= filters.dateRange!.end
+          );
+        }
+      }
+
+      return groups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }
 
-    // 필터 적용
-    if (filters) {
-      if (filters.destination) {
-        groups = groups.filter(group => 
-          group.destination.toLowerCase().includes(filters.destination!.toLowerCase())
-        );
-      }
+    try {
+      // 쿼리 파라미터 구성
+      const params = new URLSearchParams();
+      if (query) params.append('query', query);
+      if (filters?.destination) params.append('destination', filters.destination);
+      if (filters?.travelStyle) params.append('travelStyle', filters.travelStyle);
+      if (filters?.status) params.append('status', filters.status);
 
-      if (filters.travelStyle) {
-        groups = groups.filter(group => group.travelStyle === filters.travelStyle);
-      }
-
-      if (filters.status) {
-        groups = groups.filter(group => group.status === filters.status);
-      }
-
-      if (filters.tags && filters.tags.length > 0) {
-        groups = groups.filter(group => 
-          filters.tags!.some(tag => group.tags.includes(tag))
-        );
-      }
-
-      if (filters.dateRange) {
-        groups = groups.filter(group => 
-          group.startDate >= filters.dateRange!.start &&
-          group.endDate <= filters.dateRange!.end
-        );
-      }
+      const response = await apiClient.get<any[]>(`/groups?${params.toString()}`);
+      return response.map(this.mapToTravelGroup);
+    } catch (error) {
+      console.error('Failed to search groups:', error);
+      throw error;
     }
-
-    return groups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   // 새 그룹 생성
-  createGroup(request: CreateGroupRequest): TravelGroup {
-    const newGroup: TravelGroup = {
-      id: 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      ...request,
-      currentMembers: 1,
-      members: [{
-        id: this.currentUserId,
-        name: '나',
-        joinedAt: new Date(),
-        role: 'leader',
-        status: 'active'
-      }],
-      createdBy: this.currentUserId,
-      createdAt: new Date(),
-      status: 'recruiting'
-    };
+  async createGroup(request: CreateGroupRequest): Promise<TravelGroup> {
+    if (this.useMock) {
+      const newGroup: TravelGroup = {
+        id: 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        ...request,
+        currentMembers: 1,
+        members: [{
+          id: this.currentUserId,
+          name: '나',
+          joinedAt: new Date(),
+          role: 'leader',
+          status: 'active'
+        }],
+        createdBy: this.currentUserId,
+        createdAt: new Date(),
+        status: 'recruiting'
+      };
 
-    this.groups.set(newGroup.id, newGroup);
-    return newGroup;
+      this.groups.set(newGroup.id, newGroup);
+      return newGroup;
+    }
+
+    try {
+      const response = await apiClient.post<any>('/groups', {
+        title: request.name,
+        description: request.description,
+        destination: request.destination,
+        startDate: request.startDate.toISOString(),
+        endDate: request.endDate.toISOString(),
+        maxMembers: request.maxMembers,
+        travelStyle: request.travelStyle,
+        requirements: request.requirements.join(','),
+        budgetRange: request.budget
+          ? `${request.budget.min}-${request.budget.max}`
+          : undefined,
+        groupImageUrl: request.coverImage,
+      });
+      return this.mapToTravelGroup(response);
+    } catch (error) {
+      console.error('Failed to create group:', error);
+      throw error;
+    }
   }
 
   // 그룹 가입
-  joinGroup(groupId: string): boolean {
-    const group = this.groups.get(groupId);
-    if (!group) return false;
+  async joinGroup(groupId: string): Promise<boolean> {
+    if (this.useMock) {
+      const group = this.groups.get(groupId);
+      if (!group) return false;
 
-    if (group.currentMembers >= group.maxMembers) {
-      throw new Error('그룹이 가득 찼습니다.');
+      if (group.currentMembers >= group.maxMembers) {
+        throw new Error('그룹이 가득 찼습니다.');
+      }
+
+      // 이미 가입된 멤버인지 확인
+      const alreadyJoined = group.members.some(member => member.id === this.currentUserId);
+      if (alreadyJoined) {
+        throw new Error('이미 가입된 그룹입니다.');
+      }
+
+      // 새 멤버 추가
+      group.members.push({
+        id: this.currentUserId,
+        name: '나',
+        joinedAt: new Date(),
+        role: 'member',
+        status: 'active'
+      });
+
+      group.currentMembers++;
+
+      if (group.currentMembers >= group.maxMembers) {
+        group.status = 'full';
+      }
+
+      this.groups.set(groupId, group);
+      return true;
     }
 
-    // 이미 가입된 멤버인지 확인
-    const alreadyJoined = group.members.some(member => member.id === this.currentUserId);
-    if (alreadyJoined) {
-      throw new Error('이미 가입된 그룹입니다.');
+    try {
+      await apiClient.post(`/groups/${groupId}/join`, {});
+      return true;
+    } catch (error: any) {
+      console.error('Failed to join group:', error);
+      throw new Error(error.message || '그룹 가입에 실패했습니다.');
     }
-
-    // 새 멤버 추가
-    group.members.push({
-      id: this.currentUserId,
-      name: '나',
-      joinedAt: new Date(),
-      role: 'member',
-      status: 'active'
-    });
-
-    group.currentMembers++;
-
-    if (group.currentMembers >= group.maxMembers) {
-      group.status = 'full';
-    }
-
-    this.groups.set(groupId, group);
-    return true;
   }
 
   // 그룹 탈퇴
-  leaveGroup(groupId: string): boolean {
-    const group = this.groups.get(groupId);
-    if (!group) return false;
+  async leaveGroup(groupId: string): Promise<boolean> {
+    if (this.useMock) {
+      const group = this.groups.get(groupId);
+      if (!group) return false;
 
-    const memberIndex = group.members.findIndex(member => member.id === this.currentUserId);
-    if (memberIndex === -1) {
-      throw new Error('가입되지 않은 그룹입니다.');
+      const memberIndex = group.members.findIndex(member => member.id === this.currentUserId);
+      if (memberIndex === -1) {
+        throw new Error('가입되지 않은 그룹입니다.');
+      }
+
+      const member = group.members[memberIndex];
+      if (member.role === 'leader' && group.members.length > 1) {
+        throw new Error('리더는 탈퇴할 수 없습니다. 먼저 리더를 양도하세요.');
+      }
+
+      // 멤버 제거
+      group.members.splice(memberIndex, 1);
+      group.currentMembers--;
+
+      if (group.status === 'full') {
+        group.status = 'recruiting';
+      }
+
+      this.groups.set(groupId, group);
+      return true;
     }
 
-    const member = group.members[memberIndex];
-    if (member.role === 'leader' && group.members.length > 1) {
-      throw new Error('리더는 탈퇴할 수 없습니다. 먼저 리더를 양도하세요.');
+    try {
+      await apiClient.post(`/groups/${groupId}/leave`, {});
+      return true;
+    } catch (error: any) {
+      console.error('Failed to leave group:', error);
+      throw new Error(error.message || '그룹 탈퇴에 실패했습니다.');
     }
-
-    // 멤버 제거
-    group.members.splice(memberIndex, 1);
-    group.currentMembers--;
-
-    if (group.status === 'full') {
-      group.status = 'recruiting';
-    }
-
-    this.groups.set(groupId, group);
-    return true;
   }
 
   // 내가 가입한 그룹들
-  getMyGroups(): TravelGroup[] {
-    return Array.from(this.groups.values())
-      .filter(group => group.members.some(member => member.id === this.currentUserId))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  async getMyGroups(): Promise<TravelGroup[]> {
+    if (this.useMock) {
+      return Array.from(this.groups.values())
+        .filter(group => group.members.some(member => member.id === this.currentUserId))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+
+    try {
+      const response = await apiClient.get<any[]>('/groups/my-groups');
+      return response.map(this.mapToTravelGroup);
+    } catch (error) {
+      console.error('Failed to fetch my groups:', error);
+      throw error;
+    }
   }
 
   // 추천 그룹 (간단한 알고리즘)
-  getRecommendedGroups(): TravelGroup[] {
-    return Array.from(this.groups.values())
-      .filter(group => 
-        group.status === 'recruiting' && 
-        !group.members.some(member => member.id === this.currentUserId)
-      )
-      .sort(() => Math.random() - 0.5) // 랜덤 정렬
-      .slice(0, 6);
+  async getRecommendedGroups(): Promise<TravelGroup[]> {
+    if (this.useMock) {
+      return Array.from(this.groups.values())
+        .filter(group =>
+          group.status === 'recruiting' &&
+          !group.members.some(member => member.id === this.currentUserId)
+        )
+        .sort(() => Math.random() - 0.5) // 랜덤 정렬
+        .slice(0, 6);
+    }
+
+    try {
+      // 추천 API 엔드포인트가 구현되어 있다면 사용
+      // 없다면 전체 그룹 중에서 랜덤 선택
+      const response = await apiClient.get<any[]>('/groups?status=recruiting');
+      return response
+        .map(this.mapToTravelGroup)
+        .filter(group =>
+          !group.members.some(member => member.id === this.currentUserId)
+        )
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6);
+    } catch (error) {
+      console.error('Failed to fetch recommended groups:', error);
+      return [];
+    }
+  }
+
+  // 백엔드 응답을 TravelGroup으로 변환
+  private mapToTravelGroup(data: any): TravelGroup {
+    return {
+      id: data.id?.toString() || '',
+      name: data.title || data.name || '',
+      description: data.description || '',
+      destination: data.destination || '',
+      startDate: new Date(data.startDate),
+      endDate: new Date(data.endDate),
+      maxMembers: data.maxMembers || 10,
+      currentMembers: data.currentMembers || 0,
+      members: (data.members || []).map((m: any) => ({
+        id: m.userId?.toString() || m.id?.toString() || '',
+        name: m.nickname || m.name || '',
+        profileImage: m.profileImageUrl || m.profileImage,
+        joinedAt: new Date(m.joinedAt || m.createdAt),
+        role: m.role === 'CREATOR' ? 'leader' : 'member',
+        status: m.status?.toLowerCase() === 'accepted' ? 'active' : 'pending',
+        age: m.age,
+        travelStyle: m.travelStyle,
+      })),
+      tags: data.tags || [],
+      coverImage: data.groupImageUrl || data.coverImage,
+      createdBy: data.creatorId?.toString() || data.createdBy || '',
+      createdAt: new Date(data.createdAt),
+      status: this.mapStatus(data.status),
+      budget: data.budgetRange ? this.parseBudget(data.budgetRange) : undefined,
+      travelStyle: data.travelStyle || '',
+      requirements: data.requirements
+        ? (typeof data.requirements === 'string'
+            ? data.requirements.split(',').map((r: string) => r.trim())
+            : data.requirements)
+        : [],
+    };
+  }
+
+  private mapStatus(status: string): 'recruiting' | 'full' | 'active' | 'completed' {
+    const statusMap: { [key: string]: 'recruiting' | 'full' | 'active' | 'completed' } = {
+      'RECRUITING': 'recruiting',
+      'ACTIVE': 'active',
+      'COMPLETED': 'completed',
+      'CANCELLED': 'completed',
+    };
+    return statusMap[status?.toUpperCase()] || 'recruiting';
+  }
+
+  private parseBudget(budgetRange: string): { min: number; max: number; currency: string } | undefined {
+    try {
+      const parts = budgetRange.split('-');
+      if (parts.length === 2) {
+        return {
+          min: parseInt(parts[0]),
+          max: parseInt(parts[1]),
+          currency: 'KRW',
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to parse budget range:', budgetRange);
+    }
+    return undefined;
   }
 
   getCurrentUserId(): string {

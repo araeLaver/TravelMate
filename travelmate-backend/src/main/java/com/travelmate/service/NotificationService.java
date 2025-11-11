@@ -1,20 +1,31 @@
 package com.travelmate.service;
 
+import com.travelmate.entity.Notification;
+import com.travelmate.entity.User;
+import com.travelmate.repository.NotificationRepository;
+import com.travelmate.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationService {
-    
+
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
     
     public void sendNotification(Long userId, String message) {
         Map<String, Object> notification = new HashMap<>();
@@ -120,5 +131,187 @@ public class NotificationService {
         );
         
         log.info("가입 요청 알림: Group {} - Requester {}", groupId, requesterId);
+    }
+
+    // ===== 새로운 영속성 기반 알림 시스템 =====
+
+    /**
+     * 알림 생성 및 저장 (DB + WebSocket)
+     */
+    @Async
+    @Transactional
+    public void createAndSendNotification(
+            Long userId,
+            Notification.NotificationType type,
+            String title,
+            String message,
+            String actionUrl,
+            Long relatedId,
+            String relatedType) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .type(type)
+                .title(title)
+                .message(message)
+                .actionUrl(actionUrl)
+                .relatedId(relatedId)
+                .relatedType(relatedType)
+                .isRead(false)
+                .build();
+
+        notification = notificationRepository.save(notification);
+        log.info("Notification created: {} for user {}", notification.getId(), userId);
+
+        // WebSocket 실시간 전송
+        sendWebSocketNotification(userId, notification);
+
+        // FCM 푸시 (사용자가 FCM 토큰이 있으면)
+        if (user.getFcmToken() != null && !user.getFcmToken().isEmpty()) {
+            sendPushNotificationEnhanced(user.getFcmToken(), title, message, notification);
+        }
+    }
+
+    private void sendWebSocketNotification(Long userId, Notification notification) {
+        try {
+            NotificationDto dto = convertToDto(notification);
+            messagingTemplate.convertAndSendToUser(
+                    userId.toString(),
+                    "/queue/notifications",
+                    dto
+            );
+            log.info("WebSocket notification sent to user {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to send WebSocket notification", e);
+        }
+    }
+
+    @Async
+    public void sendPushNotificationEnhanced(String fcmToken, String title, String body, Notification notification) {
+        try {
+            log.info("Push notification would be sent to token: {}", fcmToken);
+            // FCM 구현은 firebase-admin SDK 추가 후 구현
+        } catch (Exception e) {
+            log.error("Failed to send push notification", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<NotificationDto> getNotifications(Long userId, Pageable pageable) {
+        Page<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        return notifications.map(this::convertToDto);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationDto> getUnreadNotifications(Long userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId);
+        return notifications.stream().map(this::convertToDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public long getUnreadCount(Long userId) {
+        return notificationRepository.countByUserIdAndIsReadFalse(userId);
+    }
+
+    @Transactional
+    public void markAsRead(List<Long> notificationIds, Long userId) {
+        int updated = notificationRepository.markAsRead(notificationIds, userId, LocalDateTime.now());
+        log.info("Marked {} notifications as read for user {}", updated, userId);
+    }
+
+    @Transactional
+    public void markAllAsRead(Long userId) {
+        int updated = notificationRepository.markAllAsRead(userId, LocalDateTime.now());
+        log.info("Marked all {} notifications as read for user {}", updated, userId);
+    }
+
+    @Transactional
+    public void deleteNotification(Long notificationId, Long userId) {
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+
+        if (!notification.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        notificationRepository.delete(notification);
+        log.info("Notification {} deleted by user {}", notificationId, userId);
+    }
+
+    @Transactional
+    public void cleanupOldNotifications(int daysToKeep) {
+        LocalDateTime beforeDate = LocalDateTime.now().minusDays(daysToKeep);
+        int deleted = notificationRepository.deleteOldNotifications(beforeDate);
+        log.info("Deleted {} old notifications (older than {} days)", deleted, daysToKeep);
+    }
+
+    // Helper methods
+    public void notifyGroupInvite(Long userId, Long groupId, String groupName, String inviterName) {
+        createAndSendNotification(
+                userId,
+                Notification.NotificationType.GROUP_INVITE,
+                "그룹 초대",
+                inviterName + "님이 '" + groupName + "' 그룹에 초대했습니다.",
+                "/groups/" + groupId,
+                groupId,
+                "GROUP"
+        );
+    }
+
+    public void notifyGroupJoin(Long userId, Long groupId, String groupName, String memberName) {
+        createAndSendNotification(
+                userId,
+                Notification.NotificationType.GROUP_JOIN,
+                "새 멤버 가입",
+                memberName + "님이 '" + groupName + "' 그룹에 가입했습니다.",
+                "/groups/" + groupId,
+                groupId,
+                "GROUP"
+        );
+    }
+
+    public void notifyNewMessage(Long userId, Long chatRoomId, String senderName, String messagePreview) {
+        createAndSendNotification(
+                userId,
+                Notification.NotificationType.NEW_MESSAGE,
+                "새 메시지",
+                senderName + ": " + messagePreview,
+                "/chat/" + chatRoomId,
+                chatRoomId,
+                "CHAT"
+        );
+    }
+
+    private NotificationDto convertToDto(Notification notification) {
+        return NotificationDto.builder()
+                .id(notification.getId())
+                .type(notification.getType())
+                .title(notification.getTitle())
+                .message(notification.getMessage())
+                .actionUrl(notification.getActionUrl())
+                .relatedId(notification.getRelatedId())
+                .relatedType(notification.getRelatedType())
+                .isRead(notification.isRead())
+                .createdAt(notification.getCreatedAt())
+                .readAt(notification.getReadAt())
+                .build();
+    }
+
+    @lombok.Builder
+    @lombok.Getter
+    public static class NotificationDto {
+        private Long id;
+        private Notification.NotificationType type;
+        private String title;
+        private String message;
+        private String actionUrl;
+        private Long relatedId;
+        private String relatedType;
+        private boolean isRead;
+        private LocalDateTime createdAt;
+        private LocalDateTime readAt;
     }
 }

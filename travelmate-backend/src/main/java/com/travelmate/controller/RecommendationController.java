@@ -1,5 +1,6 @@
 package com.travelmate.controller;
 
+import com.travelmate.dto.RecommendationDto;
 import com.travelmate.dto.UserDto;
 import com.travelmate.service.LocationService;
 import com.travelmate.service.RecommendationService;
@@ -81,5 +82,37 @@ public class RecommendationController {
             @RequestBody Map<String, Object> feedback) {
         recommendationService.processFeedback(feedback);
         return ResponseEntity.ok().build();
+    }
+
+    // ===== 고급 추천 알고리즘 API =====
+
+    /**
+     * 그룹 추천 (하이브리드 방식: 콘텐츠 기반 + 협업 필터링)
+     * GET /api/recommendations/groups?limit=10
+     */
+    @GetMapping("/groups")
+    public ResponseEntity<List<RecommendationDto.GroupRecommendation>> getGroupRecommendations(
+            @AuthenticationPrincipal String userId,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        List<RecommendationDto.GroupRecommendation> recommendations =
+                recommendationService.recommendGroups(Long.parseLong(userId), limit);
+
+        return ResponseEntity.ok(recommendations);
+    }
+
+    /**
+     * 동행자 추천 (고급 유사도 분석)
+     * GET /api/recommendations/travel-mates?limit=10
+     */
+    @GetMapping("/travel-mates")
+    public ResponseEntity<List<RecommendationDto.UserRecommendation>> getTravelMateRecommendations(
+            @AuthenticationPrincipal String userId,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        List<RecommendationDto.UserRecommendation> recommendations =
+                recommendationService.recommendTravelMates(Long.parseLong(userId), limit);
+
+        return ResponseEntity.ok(recommendations);
     }
 }

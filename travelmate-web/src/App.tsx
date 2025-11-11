@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { queryClient } from './lib/queryClient';
 import Layout from './layouts/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -15,8 +18,9 @@ import './App.css';
 
 function App() {
   return (
-    <Router>
-      <Routes>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <Routes>
         {/* 인증이 필요 없는 페이지 */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -62,8 +66,11 @@ function App() {
             <Profile />
           </Layout>
         } />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+      {/* React Query DevTools (개발 환경에서만 표시) */}
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }
 
